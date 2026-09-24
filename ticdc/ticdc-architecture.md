@@ -60,7 +60,7 @@ TiCDC 新架构通过将整体架构拆分成有状态和无状态的两部分�
 启用后，TiCDC 会自动将满足以下任一条件的表拆分并分发到多个节点并行执行同步，从而提升同步效率与资源利用率：
 
 - 表的 Region 数超过配置的阈值（默认 `10000`，可通过 `scheduler.region-threshold` 调整）。
-- 表的写入流量超过配置的阈值（默认未开启，可通过 `scheduler.write-key-threshold` 设置）。
+- 表的 Sink DML event 吞吐量超过配置的阈值（默认未开启，可通过 `scheduler.write-key-threshold` 设置，单位为每秒字节数）。
 
 > **注意：**
 >
@@ -74,7 +74,7 @@ TiCDC 新架构通过将整体架构拆分成有状态和无状态的两部分�
 
 - [`scheduler.region-threshold`](/ticdc/ticdc-changefeed-config.md#region-threshold)：默认值为 `10000`。当表的 Region 数量超过该阈值时，TiCDC 会对该表执行拆分。对于 Region 数量较少但表整体写入流量较高的场景，可以适当降低该值。该参数必须大于或等于 `scheduler.region-count-per-span`，否则可能导致任务频繁调度，并增加同步延迟。
 - [`scheduler.region-count-per-span`](/ticdc/ticdc-changefeed-config.md#region-count-per-span-从-v854-版本开始引入)：默认值为 `100`。在 Changefeed 初始化阶段，满足拆分条件的表会按照该参数进行拆分。拆分后，每个子表最多包含 `region-count-per-span` 个 Region。
-- [`scheduler.write-key-threshold`](/ticdc/ticdc-changefeed-config.md#write-key-threshold)：默认值为 `0`（表示关闭）。当表的 Sink 写入流量超过该阈值时，TiCDC 会触发拆分。建议保持默认值 `0`。
+- [`scheduler.write-key-threshold`](/ticdc/ticdc-changefeed-config.md#write-key-threshold)：默认值为 `0`（表示关闭）。在新架构中，该值的单位是 Sink DML event 的每秒字节数。如果设置了大于 `0` 且小于 `10485760`（10 MiB）的值，TiCDC 会自动将其调整为 `10485760`。建议保持默认值 `0`。
 
 ## 兼容性说明
 
@@ -145,7 +145,7 @@ cdc_servers:
 spec:
   ticdc:
     baseImage: pingcap/ticdc
-    version: v{{{ .ticdc-version }}}
+    version: v8.5.4
     replicas: 3
     config:
       newarch = true
@@ -169,10 +169,10 @@ spec:
 
     离线包下载链接格式为 `https://tiup-mirrors.pingcap.com/cdc-${version}-${os}-${arch}.tar.gz`。其中，`${version}` 为 TiCDC 版本号（版本号信息可参考 [TiCDC 新架构版本发布列表](https://github.com/pingcap/ticdc/releases)），`${os}` 为你的操作系统，`${arch}` 为组件运行的平台（`amd64` 或 `arm64`）。
 
-    例如，可以使用以下命令下载 Linux 系统 x86-64 架构的 TiCDC v{{{ .ticdc-version }}} 离线包：
+    例如，可以使用以下命令下载 Linux 系统 x86-64 架构的 TiCDC v8.5.4-release.1 的离线包：
 
     ```shell
-    wget https://tiup-mirrors.pingcap.com/cdc-v{{{ .ticdc-version }}}-linux-amd64.tar.gz
+    wget https://tiup-mirrors.pingcap.com/cdc-v8.5.4-release.1-linux-amd64.tar.gz
     ```
 
 3. 如果集群中已经有 Changefeed，请参考[停止同步任务](/ticdc/ticdc-manage-changefeed.md#停止同步任务)暂停所有的 Changefeed 同步任务。例如：
@@ -185,7 +185,7 @@ spec:
 4. 使用 [`tiup cluster patch`](/tiup/tiup-component-cluster-patch.md) 命令将下载的 TiCDC 二进制文件动态替换到你的 TiDB 集群中：
 
     ```shell
-    tiup cluster patch <cluster-name> ./cdc-v{{{ .ticdc-version }}}-linux-amd64.tar.gz -R cdc --overwrite
+    tiup cluster patch <cluster-name> ./cdc-v8.5.4-release.1-linux-amd64.tar.gz -R cdc --overwrite
     ```
 
 5. 通过 [`tiup cluster edit-config`](/tiup/tiup-component-cluster-edit-config.md) 命令更新 TiCDC 配置以启用 TiCDC 新架构：
@@ -220,7 +220,7 @@ spec:
     spec:
       ticdc:
         baseImage: pingcap/ticdc
-        version: v{{{ .ticdc-version }}}
+        version: v8.5.4-release.1
         replicas: 3
         config:
           newarch = true
@@ -249,7 +249,7 @@ spec:
         spec:
           ticdc:
             baseImage: pingcap/ticdc
-            version: v{{{ .ticdc-version }}}
+            version: v8.5.4-release.1
             replicas: 3
         ```
 
